@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.7.1/dist/leaflet.css">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <title>Planette Energy Policy Aggregator</title>
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+
+        h1 {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .container {
+            padding: 20px;
+        }
+
+        .form-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin: 10px 0;
+        }
+
+        .map-articles-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+        }
+
+        .map-container {
+            flex: 1.8;
+            height: 400px; /* Set the desired height for the map */
+            margin-bottom: 20px;
+        }
+
+        #map {
+            height: 100%;
+        }
+
+        .articles-container {
+            flex: 1;
+            padding: 10px;
+        }
+
+        .article {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #fff;
+        }
+
+        .article-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .pie-chart {
+            margin-bottom: 20px;
+        }
+
+        /* Add new CSS for the filter button */
+        .btn-filter {
+            height: 39px; /* Set the desired height of the button (adjust as needed) */
+            padding: 10px 25px; /* Adjust padding to match input fields' style */
+            font-size: 14px; /* Increase font size to make it more prominent */
+        }
+
+        @media (max-width: 768px) {
+            .map-articles-container {
+                flex-direction: column;
+            }
+
+            .map-container,
+            .articles-container {
+                width: 100%;
+            }
+        }
+
+        /* New styles to achieve the desired layout */
+        @media (min-width: 768px) {
+            .map-articles-container {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                grid-gap: 20px;
+            }
+        }
+
+        @media (min-width: 992px) {
+            .articles-container {
+                /* On larger screens, fill the space below the map and pie chart */
+                grid-column: span 2;
+            }
+
+            /* Additional styles to place pie chart beside the map on larger screens */
+            .map-container {
+                flex: 1;
+                height: 400px;
+            }
+
+            .pie-chart-container {
+                flex: 1;
+                height: 400px;
+            }
+        }
+
+        /* Additional styles for dividing articles vertically into sentiment parts */
+        .articles-heading {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .articles-list {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .articles-section {
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+    <h1>Planette Energy Policy Aggregator</h1>
+
+    <div class="container">
+        <form class="form-container" method="POST" action="/" onsubmit="return validateForm()">
+            <div class="form-group">
+                <label for="start-date">Start Date:</label>
+                <input type="date" class="form-control" id="start-date" name="start-date" required>
+            </div>
+            <div class="form-group">
+                <label for="end-date">End Date:</label>
+                <input type="date" class="form-control" id="end-date" name="end-date" required>
+            </div>
+            <div class="form-group">
+                <label for="region">Region:</label>
+                <input type="text" class="form-control" id="region" name="region" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label for="keywords">Keyword (separated by comma):</label>
+                <input type="text" class="form-control" id="keywords" name="keywords">
+            </div>
+            <div class="form-group d-flex align-items-end">
+                <button type="submit" class="btn btn-primary btn-sm btn-filter">Filter</button>
+            </div>
+        </form>
+
+        <div class="map-articles-container">
+            <div class="map-container">
+                <div id="map"></div>
+            </div>
+
+            <!-- Show the pie chart only if there are positive, neutral, or negative articles -->
+            {% if positive_articles or neutral_articles or negative_articles %}
+            <div class="pie-chart-container">
+                <div class="pie-chart">
+                    <img src="{{ url_for('static', filename='topic_pie_chart.png') }}" alt="Topic Pie Chart" class="img-fluid">
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="articles-container"> 
+                {% if positive_articles or neutral_articles or negative_articles %}
+                <div class="articles">
+                    <div class="articles-list">
+                        <div class="articles-section">
+                            {% if positive_articles %}
+                            <h2 class="articles-heading">Positive Articles</h2>
+                            {% for article in positive_articles %}
+                            <div class="card mb-2">
+                                <div class="card-body">
+                                    <h3 class="article-title" style="font-size: 18px; font-weight: bold;">{{ article['title'] }}</h3>
+                                    <p class="card-text">{{ article['description'] | striptags | safe }}</p>
+                                    <a href="{{ article['link'] }}" class="btn btn-primary">Read more</a>
+                                    <p class="card-text">Published: {{ article['published'] }}</p>
+                                </div>
+                            </div>
+                            {% endfor %}
+                            {% endif %}
+                        </div>
+
+                        <div class="articles-section">
+                            {% if neutral_articles %}
+                            <h2 class="articles-heading">Neutral Articles</h2>
+                            {% for article in neutral_articles %}
+                            <div class="card mb-2">
+                                <div class="card-body">
+                                    <h3 class="article-title" style="font-size: 18px; font-weight: bold;">{{ article['title'] }}</h3>
+                                    <p class="card-text">{{ article['description'] | striptags | safe }}</p>
+                                    <a href="{{ article['link'] }}" class="btn btn-primary">Read more</a>
+                                    <p class="card-text">Published: {{ article['published'] }}</p>
+                                </div>
+                            </div>
+                            {% endfor %}
+                            {% endif %}
+                        </div>
+
+                        <div class="articles-section">
+                            {% if negative_articles %}
+                            <h2 class="articles-heading">Negative Articles</h2>
+                            {% for article in negative_articles %}
+                            <div class="card mb-2">
+                                <div class="card-body">
+                                    <h3 class="article-title" style="font-size: 18px; font-weight: bold;">{{ article['title'] }}</h3>
+                                    <p class="card-text">{{ article['description'] | striptags | safe }}</p>
+                                    <a href="{{ article['link'] }}" class="btn btn-primary">Read more</a>
+                                    <p class="card-text">Published: {{ article['published'] }}</p>
+                                </div>
+                            </div>
+                            {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+        var map = L.map('map').setView([0, 0], 1.45);
+
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors',
+            maxZoom: 18,
+        }).addTo(map);
+
+
+        // Store the selected countries in a global variable
+        var selectedCountries = [];
+
+
+        // Add event listener for map click
+        map.on('click', function(e) {
+            var latitude = e.latlng.lat;
+            var longitude = e.latlng.lng;
+
+
+            // Send the latitude and longitude values to the server
+            fetch('/get_country', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    latitude: latitude,
+                    longitude: longitude
+                })
+            })
+            .then(function(response) {
+                // Handle the response
+                if (response.ok) {
+                    console.log('Coordinates sent to the server.');
+                    // Display the country in the region input box
+                    response.json().then(function(data) {
+                        var regionInput = document.getElementById('region');
+                        if (data.country) {
+                            selectedCountries.push(data.country);
+                            updateRegionInput(regionInput);
+                        }
+                    }).catch(function(error) {
+                        console.log('Error parsing JSON response:', error);
+                    });
+                } else {
+                    console.log('Error sending coordinates to the server.');
+                }
+            })
+            .catch(function(error) {
+                console.log('Error sending coordinates to the server:', error);
+            });
+        });
+
+
+        // Update the region input box value with the selected countries
+        function updateRegionInput(regionInput) {
+            regionInput.value = selectedCountries.join(', ');
+        }
+
+
+        // Add event listener for region input box
+        var regionInput = document.getElementById('region');
+        regionInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Backspace' && regionInput.value === '') {
+                selectedCountries.pop();
+                updateRegionInput(regionInput);
+            }
+        });
+
+
+        // Set the end date to the current date by default
+        var endDateInput = document.getElementById('end-date');
+        var currentDate = new Date().toISOString().split('T')[0];
+        endDateInput.value = currentDate;
+
+
+        // Set the max date for start date and end date inputs
+        var startDateInput = document.getElementById('start-date');
+        startDateInput.setAttribute('max', currentDate);
+        endDateInput.setAttribute('max', currentDate);
+
+
+        // Validate the date inputs before submitting the form
+        function validateForm() {
+            var startDate = new Date(startDateInput.value);
+            var endDate = new Date(endDateInput.value);
+
+
+            if (endDate < startDate) {
+                alert('End date cannot be before the start date.');
+                return false;
+            }
+
+
+            return true;
+        }
+    </script>
+</body>
+</html>
