@@ -8,6 +8,7 @@ bqplot==0.12.39
 branca==0.6.0
 cachelib==0.10.2
 certifi==2023.5.7
+charset-normalizer==3.2.0
 click==8.1.4
 colorama==0.4.6
 colour==0.1.5
